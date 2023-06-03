@@ -1,7 +1,7 @@
 package com.github.zxbu.webdavteambition.config;
 
 import com.github.zxbu.webdavteambition.model.result.TFile;
-import com.github.zxbu.webdavteambition.store.AliYunDriverClientService;
+import com.github.zxbu.webdavteambition.service.AliYunDriverClientService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -23,6 +23,5 @@ public class AliYunDriverCronTask {
         } catch (Exception e) {
             // nothing
         }
-
     }
 }

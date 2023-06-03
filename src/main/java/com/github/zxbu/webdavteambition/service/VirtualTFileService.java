@@ -1,4 +1,4 @@
-package com.github.zxbu.webdavteambition.store;
+package com.github.zxbu.webdavteambition.service;
 
 import com.github.zxbu.webdavteambition.model.FileType;
 import com.github.zxbu.webdavteambition.model.result.TFile;

@@ -1,15 +1,15 @@
 package net.sf.webdav;
 
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServlet;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import net.sf.webdav.exceptions.UnauthenticatedException;
 import net.sf.webdav.exceptions.WebdavException;
 import net.sf.webdav.fromcatalina.MD5Encoder;
 import net.sf.webdav.locking.ResourceLocks;
 import net.sf.webdav.methods.*;
 
-import javax.servlet.ServletException;
-import javax.servlet.http.HttpServlet;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -186,7 +186,7 @@ public class WebDavServletBean extends HttpServlet {
 
     private boolean returnError(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         if (req.getRequestURI().equals("/error")) {
-            Object codeObject = req.getAttribute("javax.servlet.error.status_code");
+            Object codeObject = req.getAttribute("jakarta.servlet.error.status_code");
             if (codeObject != null) {
                 int code = Integer.parseInt(codeObject.toString());
                 if (code > 400) {

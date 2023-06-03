@@ -1,7 +1,7 @@
 package com.github.zxbu.webdavteambition;
 
 import com.github.zxbu.webdavteambition.filter.ErrorFilter;
-import com.github.zxbu.webdavteambition.store.AliYunDriverFileSystemStore;
+import com.github.zxbu.webdavteambition.service.AliYunDriverFileSystemStore;
 import net.sf.webdav.WebdavServlet;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

@@ -4,8 +4,6 @@
 - [webdav-aliyundriver](#webdav-aliyundriver)
 - [如何使用](#如何使用)
   - [Jar包运行](#jar包运行)
-  - [容器运行](#容器运行)
-  - [Docker-Compose](#docker-compose)
 - [参数说明](#参数说明)
 - [客户端兼容性](#客户端兼容性)
 - [浏览器获取refreshToken方式](#浏览器获取refreshtoken方式)
@@ -29,41 +27,6 @@
 ```bash
 java -jar webdav.jar --aliyundrive.refresh-token="your refreshToken"
 ```
-## 容器运行
-```bash
-docker run -d --name=webdav-aliyundriver --restart=always -p 8080:8080  -v /etc/localtime:/etc/localtime -v /etc/aliyun-driver/:/etc/aliyun-driver/ -e TZ="Asia/Shanghai" -e ALIYUNDRIVE_REFRESH_TOKEN="your refreshToken" -e ALIYUNDRIVE_AUTH_PASSWORD="admin" -e JAVA_OPTS="-Xmx1g" zx5253/webdav-aliyundriver
-
-# /etc/aliyun-driver/ 挂载卷自动维护了最新的refreshToken，建议挂载
-# ALIYUNDRIVE_AUTH_PASSWORD 是admin账户的密码，建议修改
-# JAVA_OPTS 可修改最大内存占用，比如 -e JAVA_OPTS="-Xmx512m" 表示最大内存限制为512m
-```
-
-## Docker-Compose
-```yml
-version: "3.0"
-services:
-  webdav-aliyundriver:
-    image: zx5253/webdav-aliyundriver
-    container_name: aliyundriver
-    environment:
-      - TZ=Asia/Shanghai
-      - ALIYUNDRIVE_REFRESH_TOKEN=refreshToken
-      - ALIYUNDRIVE_AUTH_USER_NAME=admin
-      - ALIYUNDRIVE_AUTH_PASSWORD=admin
-      - JAVA_OPTS=-Xmx1g
-    volumes:
-      - /etc/aliyun-driver/:/etc/aliyun-driver/
-    ports:
-      - 6666:8080
-    restart: always
-
-# “refreshToken”请根据下文说明自行获取。
-# “ALIYUNDRIVE_AUTH_USER-NAME”和“ALIYUNDRIVE_AUTH_PASSWORD”为连接用户名和密码，建议更改。
-# “/etc/aliyun-driver/:/etc/aliyun-driver/”，可以把冒号前改为指定目录，比如“/homes/USER/docker/alidriver/:/etc/aliyun-driver/”。
-# 删除了“/etc/localtime:/etc/localtime”，如有需要同步时间请自行添加在environment下。
-# 端口6666可自行按需更改，此端口为WebDAV连接端口,8080为容器内配置端口，修改请量力而为。
-# 建议不要保留这些中文注释，以防报错，比如QNAP。
-```
 
 # 参数说明
 ```bash
@@ -79,7 +42,6 @@ services:
     WebDav密码，默认admin
 --aliyundrive.work-dir=/etc/aliyun-driver/
     token挂载路径（如果多开的话，需修改此配置）
-    
 ```
 
 # 客户端兼容性
@@ -122,6 +84,8 @@ services:
 ## TODO
 1. 支持更多登录方式（验证码、账号密码等）
 
+## API类似文档 -- 阿里云的其他服务的API文档
+[网盘与相册服务](https://help.aliyun.com/document_detail/440384.html?spm=a2c4g.440383.0.0.24bc178dFDlzb5)
 
 # 免责声明
 1. 本软件为免费开源项目，无任何形式的盈利行为。

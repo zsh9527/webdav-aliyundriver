@@ -1,4 +1,4 @@
-package com.github.zxbu.webdavteambition.store;
+package com.github.zxbu.webdavteambition.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -10,6 +10,7 @@ import com.github.zxbu.webdavteambition.model.result.TFile;
 import com.github.zxbu.webdavteambition.model.result.TFileListResult;
 import com.github.zxbu.webdavteambition.model.result.UploadPreResult;
 import com.github.zxbu.webdavteambition.util.JsonUtil;
+import lombok.SneakyThrows;
 import net.sf.webdav.exceptions.WebdavException;
 import okhttp3.HttpUrl;
 import okhttp3.Response;
@@ -20,11 +21,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
-import javax.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletRequest;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -76,6 +76,7 @@ public class AliYunDriverClientService {
         return tFileSets;
     }
 
+    @SneakyThrows
     private List<TFile> fileListFromApi(String nodeId, String marker, List<TFile> all) {
         FileListRequest listQuery = new FileListRequest();
         listQuery.setMarker(marker);
@@ -84,8 +85,8 @@ public class AliYunDriverClientService {
         listQuery.setOrder_direction("DESC");
         listQuery.setDrive_id(client.getDriveId());
         listQuery.setParent_file_id(nodeId);
-        String json = client.post("/file/list", listQuery);
-        TFileListResult<TFile> tFileListResult = JsonUtil.readValue(json, new TypeReference<TFileListResult<TFile>>() {
+        String json = client.post("/adrive/v3/file/list", listQuery);
+        TFileListResult<TFile> tFileListResult = JsonUtil.readValue(json, new TypeReference<>() {
         });
         all.addAll(tFileListResult.getItems());
         if (!StringUtils.hasLength(tFileListResult.getNext_marker())) {
@@ -98,7 +99,7 @@ public class AliYunDriverClientService {
     private Map<String, String> toMap(Object o) {
         try {
             String json = objectMapper.writeValueAsString(o);
-            Map<String, Object> rawMap = objectMapper.readValue(json, new TypeReference<Map<String, Object>>() {
+            Map<String, Object> rawMap = objectMapper.readValue(json, new TypeReference<>() {
             });
             Map<String, String> stringMap = new LinkedHashMap<>();
             rawMap.forEach((s, o1) -> {
@@ -112,6 +113,7 @@ public class AliYunDriverClientService {
         }
     }
 
+    @SneakyThrows
     public void uploadPre(String path, long size, InputStream inputStream) {
         path = normalizingPath(path);
         PathInfo pathInfo = getPathInfo(path);
@@ -148,7 +150,7 @@ public class AliYunDriverClientService {
 
         LOGGER.info("开始上传文件，文件名：{}，总大小：{}, 文件块数量：{}", path, size, chunkCount);
 
-        String json = client.post("/file/create_with_proof", uploadPreRequest);
+        String json = client.post("/adrive/v2/file/createWithFolders", uploadPreRequest);
         UploadPreResult uploadPreResult = JsonUtil.readValue(json, UploadPreResult.class);
         List<UploadPreRequest.PartInfo> partInfoList = uploadPreResult.getPart_info_list();
         if (partInfoList != null) {
@@ -169,7 +171,7 @@ public class AliYunDriverClientService {
                     refreshUploadUrlRequest.setUpload_id(uploadPreResult.getUpload_id());
                     refreshUploadUrlRequest.setFile_id(uploadPreResult.getFile_id());
                     refreshUploadUrlRequest.setPart_info_list(part_info_list);
-                    String refreshJson = client.post("/file/get_upload_url", refreshUploadUrlRequest);
+                    String refreshJson = client.post("/v2/file/get_upload_url", refreshUploadUrlRequest);
                     UploadPreResult refreshResult = JsonUtil.readValue(refreshJson, UploadPreResult.class);
                     for (int j = i; j < partInfoList.size(); j++) {
                         UploadPreRequest.PartInfo oldInfo = partInfoList.get(j);
@@ -201,13 +203,14 @@ public class AliYunDriverClientService {
         uploadFinalRequest.setDrive_id(client.getDriveId());
         uploadFinalRequest.setUpload_id(uploadPreResult.getUpload_id());
 
-        client.post("/file/complete", uploadFinalRequest);
+        client.post("/v2/file/complete", uploadFinalRequest);
         virtualTFileService.remove(parent.getFile_id(), uploadPreResult.getFile_id());
         LOGGER.info("文件上传成功。文件名：{}", path);
         clearCache();
     }
 
 
+    @SneakyThrows
     public void rename(String sourcePath, String newName) {
         sourcePath = normalizingPath(sourcePath);
         TFile tFile = getTFileByPath(sourcePath);
@@ -215,10 +218,11 @@ public class AliYunDriverClientService {
         renameRequest.setDrive_id(client.getDriveId());
         renameRequest.setFile_id(tFile.getFile_id());
         renameRequest.setName(newName);
-        client.post("/file/update", renameRequest);
+        client.post("/v2/file/update", renameRequest);
         clearCache();
     }
 
+    @SneakyThrows
     public void move(String sourcePath, String targetPath) {
         sourcePath = normalizingPath(sourcePath);
         targetPath = normalizingPath(targetPath);
@@ -229,10 +233,11 @@ public class AliYunDriverClientService {
         moveRequest.setDrive_id(client.getDriveId());
         moveRequest.setFile_id(sourceTFile.getFile_id());
         moveRequest.setTo_parent_file_id(targetTFile.getFile_id());
-        client.post("/file/move", moveRequest);
+        client.post("/v2/file/move", moveRequest);
         clearCache();
     }
 
+    @SneakyThrows
     public void remove(String path) {
         path = normalizingPath(path);
         TFile tFile = getTFileByPath(path);
@@ -242,11 +247,11 @@ public class AliYunDriverClientService {
         RemoveRequest removeRequest = new RemoveRequest();
         removeRequest.setDrive_id(client.getDriveId());
         removeRequest.setFile_id(tFile.getFile_id());
-        client.post("/recyclebin/trash", removeRequest);
+        client.post("/v2/recyclebin/trash", removeRequest);
         clearCache();
     }
 
-
+    @SneakyThrows
     public void createFolder(String path) {
         path = normalizingPath(path);
         PathInfo pathInfo = getPathInfo(path);
@@ -261,7 +266,7 @@ public class AliYunDriverClientService {
         createFileRequest.setName(pathInfo.getName());
         createFileRequest.setParent_file_id(parent.getFile_id());
         createFileRequest.setType(FileType.folder.name());
-        String json = client.post("/file/create_with_proof", createFileRequest);
+        String json = client.post("/adrive/v2/file/createWithFolders", createFileRequest);
         TFile createFileResult = JsonUtil.readValue(json, TFile.class);
         if (createFileResult.getFile_name() == null) {
             LOGGER.error("创建目录{}失败: {}",path, json);
@@ -281,12 +286,13 @@ public class AliYunDriverClientService {
         return getNodeIdByPath2(path);
     }
 
+    @SneakyThrows
     public Response download(String path, HttpServletRequest request, long size ) {
         TFile file = getTFileByPath(path);
         DownloadRequest downloadRequest = new DownloadRequest();
         downloadRequest.setDrive_id(client.getDriveId());
         downloadRequest.setFile_id(file.getFile_id());
-        String json = client.post("/file/get_download_url", downloadRequest);
+        String json = client.post("/v2/file/get_download_url", downloadRequest);
         Object url = JsonUtil.getJsonNodeValue(json, "url");
         LOGGER.debug("{} url = {}", path, url);
         return client.download(url.toString(), request, size);

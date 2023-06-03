@@ -2,100 +2,79 @@ package com.github.zxbu.webdavteambition.client;
 
 import com.github.zxbu.webdavteambition.config.AliYunDriveProperties;
 import com.github.zxbu.webdavteambition.util.JsonUtil;
+import io.github.resilience4j.retry.annotation.Retry;
+import jakarta.annotation.PostConstruct;
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import net.sf.webdav.exceptions.WebdavException;
 import okhttp3.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.util.Assert;
-import org.springframework.util.StringUtils;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Component;
 
-import javax.servlet.http.HttpServletRequest;
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.LinkOption;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
 
+/**
+ * okhttpClient请求数据统一封装和解析 + 几个特定请求
+ */
+@Component
+@Slf4j
+@RequiredArgsConstructor
+@Lazy
+@Retry(name = "retry-backend")
 public class AliYunDriverClient {
-    private static final Logger LOGGER = LoggerFactory.getLogger(AliYunDriverClient.class);
-    private OkHttpClient okHttpClient;
-    private AliYunDriveProperties aliYunDriveProperties;
+    private final OkHttpClient okHttpClient;
+    private final AliYunDriveProperties aliYunDriveProperties;
+    private String deviceId;
+    private String userId;
 
-    public AliYunDriverClient(AliYunDriveProperties aliYunDriveProperties) {
-
-        OkHttpClient okHttpClient = new OkHttpClient.Builder().addInterceptor(new Interceptor() {
-            @Override
-            public Response intercept(Chain chain) throws IOException {
-                Request request = chain.request();
-                request = request.newBuilder()
-                        .removeHeader("User-Agent")
-                        .addHeader("User-Agent", aliYunDriveProperties.getAgent())
-                        .removeHeader("authorization")
-                        .addHeader("authorization", aliYunDriveProperties.getAuthorization())
-                        .build();
-                return chain.proceed(request);
-            }
-        }).authenticator(new Authenticator() {
-            @Override
-            public Request authenticate(Route route, Response response) throws IOException {
-                if (response.code() == 401 && response.body() != null  && response.body().string().contains("AccessToken")) {
-                    String refreshTokenResult;
-                    Map<String, String> pamars = new HashMap<>();
-                    pamars.put("refresh_token", readRefreshToken());
-                    pamars.put("grant_type", "refresh_token");
-                    try {
-                        refreshTokenResult = post("https://auth.aliyundrive.com/v2/account/token", pamars);
-                    } catch (Exception e) {
-                        // 如果置换token失败，先清空原token文件，再尝试一次
-                        deleteRefreshTokenFile();
-                        refreshTokenResult = post("https://auth.aliyundrive.com/v2/account/token", pamars);
-                    }
-                    String accessToken = (String) JsonUtil.getJsonNodeValue(refreshTokenResult, "access_token");
-                    String refreshToken = (String) JsonUtil.getJsonNodeValue(refreshTokenResult, "refresh_token");
-                    Assert.hasLength(accessToken, "获取accessToken失败");
-                    Assert.hasLength(refreshToken, "获取refreshToken失败");
-                    aliYunDriveProperties.setAuthorization(accessToken);
-                    writeRefreshToken(refreshToken);
-                    return response.request().newBuilder()
-                            .removeHeader("authorization")
-                            .header("authorization", accessToken)
-                            .build();
-                }
-                return null;
-            }
-        })
-                .readTimeout(1, TimeUnit.MINUTES)
-                .writeTimeout(1, TimeUnit.MINUTES)
-                .connectTimeout(1, TimeUnit.MINUTES)
-                .build();
-        this.okHttpClient = okHttpClient;
-        this.aliYunDriveProperties = aliYunDriveProperties;
-        init();
+    /**
+     * 获取device_id, 用于后续请求
+     */
+    @PostConstruct
+    public void init() throws IOException {
+        String personalJson = post("/v2/user/get", Collections.emptyMap());
+        this.deviceId = (String) JsonUtil.getJsonNodeValue(personalJson, "default_drive_id");
+        this.userId = (String) JsonUtil.getJsonNodeValue(personalJson, "user_id");
     }
-
-
-    public void init() {
-
-        if (getDriveId() == null) {
-            String personalJson = post("/user/get", Collections.emptyMap());
-            String driveId = (String) JsonUtil.getJsonNodeValue(personalJson, "default_drive_id");
-            aliYunDriveProperties.setDriveId(driveId);
-        }
-    }
-
 
     public String getDriveId() {
-        return aliYunDriveProperties.getDriveId();
+        return this.deviceId;
     }
 
+    public String getUserId() {
+        return this.userId;
+    }
 
-    public Response download(String url, HttpServletRequest httpServletRequest, long size ) {
+    public String post(String url, Object body) throws IOException {
+        String bodyAsJson = JsonUtil.toJson(body);
+        Request request = new Request.Builder()
+            .post(RequestBody.create(MediaType.parse("application/json; charset=utf-8"), bodyAsJson))
+            .url(getTotalUrl(url)).build();
+        Response response = requestContent(request);
+        return toString(response.body());
+    }
+
+    public String put(String url, Object body) throws IOException {
+        Request request = new Request.Builder()
+            .put(RequestBody.create(MediaType.parse("application/json; charset=utf-8"), JsonUtil.toJson(body)))
+            .url(getTotalUrl(url)).build();
+        Response response = requestContent(request);
+        return toString(response.body());
+    }
+
+    public String get(String url, Map<String, String> params) throws IOException {
+        HttpUrl.Builder urlBuilder = HttpUrl.parse(getTotalUrl(url)).newBuilder();
+        params.forEach(urlBuilder::addQueryParameter);
+
+        Request request = new Request.Builder().get().url(urlBuilder.build()).build();
+        Response response = requestContent(request);
+        return toString(response.body());
+    }
+
+    public Response download(String url, HttpServletRequest httpServletRequest, long size) throws IOException {
         Request.Builder builder = new Request.Builder().header("referer", "https://www.aliyundrive.com/");
         String range = httpServletRequest.getHeader("range");
         if (range != null) {
@@ -114,84 +93,37 @@ public class AliYunDriverClient {
         if (ifRange != null) {
             builder.header("if-range", ifRange);
         }
-
-
         Request request = builder.url(url).build();
-        Response response = null;
+        return okHttpClient.newCall(request).execute();
+    }
+
+    public void upload(String url, byte[] bytes, final int offset, final int byteCount) throws IOException {
+        Request request = new Request.Builder()
+            .put(RequestBody.create(MediaType.parse(""), bytes, offset, byteCount))
+            .url(url).build();
+        okHttpClient.newCall(request).execute();
+    }
+
+    /**
+     * 409, 频繁请求引起, 抛出IOException重试
+     */
+    private Response requestContent(Request request) throws IOException {
+        Response response;
         try {
             response = okHttpClient.newCall(request).execute();
-            return response;
         } catch (IOException e) {
             throw new WebdavException(e);
         }
-    }
-
-    public void upload(String url, byte[] bytes, final int offset, final int byteCount) {
-        Request request = new Request.Builder()
-                .put(RequestBody.create(MediaType.parse(""), bytes, offset, byteCount))
-                .url(url).build();
-        try (Response response = okHttpClient.newCall(request).execute()){
-            LOGGER.info("upload {}, code {}", url, response.code());
-            if (!response.isSuccessful()) {
-                LOGGER.error("请求失败，url={}, code={}, body={}", url, response.code(), response.body().string());
-                throw new WebdavException("请求失败：" + url);
-            }
-        } catch (IOException e) {
-            throw new WebdavException(e);
-        }
-    }
-
-    public String post(String url, Object body) {
-        String bodyAsJson = JsonUtil.toJson(body);
-        Request request = new Request.Builder()
-                .post(RequestBody.create(MediaType.parse("application/json; charset=utf-8"), bodyAsJson))
-                .url(getTotalUrl(url)).build();
-        try (Response response = okHttpClient.newCall(request).execute()){
-            LOGGER.info("post {}, body {}, code {}", url, bodyAsJson, response.code());
-            if (!response.isSuccessful()) {
-                LOGGER.error("请求失败，url={}, code={}, body={}", url, response.code(), response.body().string());
-                throw new WebdavException("请求失败：" + url);
-            }
-            return toString(response.body());
-        } catch (IOException e) {
-            throw new WebdavException(e);
-        }
-    }
-
-    public String put(String url, Object body) {
-        Request request = new Request.Builder()
-                .put(RequestBody.create(MediaType.parse("application/json; charset=utf-8"), JsonUtil.toJson(body)))
-                .url(getTotalUrl(url)).build();
-        try (Response response = okHttpClient.newCall(request).execute()){
-            LOGGER.info("put {}, code {}", url, response.code());
-            if (!response.isSuccessful()) {
-                LOGGER.error("请求失败，url={}, code={}, body={}", url, response.code(), response.body().string());
-                throw new WebdavException("请求失败：" + url);
-            }
-            return toString(response.body());
-        } catch (IOException e) {
-            throw new WebdavException(e);
-        }
-    }
-
-    public String get(String url, Map<String, String> params)  {
-        try {
-            HttpUrl.Builder urlBuilder = HttpUrl.parse(getTotalUrl(url)).newBuilder();
-            params.forEach(urlBuilder::addQueryParameter);
-
-            Request request = new Request.Builder().get().url(urlBuilder.build()).build();
-            try (Response response = okHttpClient.newCall(request).execute()){
-                LOGGER.info("get {}, code {}", urlBuilder.build(), response.code());
-                if (!response.isSuccessful()) {
-                    throw new WebdavException("请求失败：" + urlBuilder.build().toString());
-                }
-                return toString(response.body());
+        if (!response.isSuccessful()) {
+            log.warn(request.url() + ", 请求失败: " + response.message());
+            if (response.code() == 429) {
+                throw new IOException("请求失败");
+            } else {
+                throw new WebdavException("请求失败:" + response.message());
             }
 
-        } catch (Exception e) {
-            throw new WebdavException(e);
         }
-
+        return response;
     }
 
     private String toString(ResponseBody responseBody) throws IOException {
@@ -206,49 +138,5 @@ public class AliYunDriverClient {
             return url;
         }
         return aliYunDriveProperties.getUrl() + url;
-    }
-
-    private void deleteRefreshTokenFile() {
-        String refreshTokenPath = aliYunDriveProperties.getWorkDir() + "refresh-token";
-        Path path = Paths.get(refreshTokenPath);
-        try {
-            Files.delete(path);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    private String readRefreshToken() {
-        String refreshTokenPath = aliYunDriveProperties.getWorkDir() + "refresh-token";
-        Path path = Paths.get(refreshTokenPath);
-
-        if (!Files.exists(path, LinkOption.NOFOLLOW_LINKS)) {
-            try {
-                Files.createDirectories(path.getParent());
-                Files.createFile(path);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-        try {
-            byte[] bytes = Files.readAllBytes(path);
-            if (bytes.length != 0) {
-                return new String(bytes, StandardCharsets.UTF_8);
-            }
-        } catch (IOException e) {
-            LOGGER.warn("读取refreshToken文件 {} 失败: ", refreshTokenPath, e);
-        }
-        writeRefreshToken(aliYunDriveProperties.getRefreshToken());
-        return aliYunDriveProperties.getRefreshToken();
-    }
-
-    private void writeRefreshToken(String newRefreshToken) {
-        String refreshTokenPath = aliYunDriveProperties.getWorkDir() + "refresh-token";
-        try {
-            Files.write(Paths.get(refreshTokenPath), newRefreshToken.getBytes(StandardCharsets.UTF_8));
-        } catch (IOException e) {
-            LOGGER.warn("写入refreshToken文件 {} 失败: ", refreshTokenPath, e);
-        }
-        aliYunDriveProperties.setRefreshToken(newRefreshToken);
     }
 }

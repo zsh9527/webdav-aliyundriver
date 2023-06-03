@@ -1,0 +1,55 @@
+server:
+  port: 9027
+  tomcat:
+    connection-timeout: 1d
+spring:
+  main:
+    allow-circular-references: true
+  application:
+    name: ali-webdav
+  jackson:
+    time-zone: GMT+8
+    property-naming-strategy: SNAKE_CASE
+    default-property-inclusion: NON_NULL
+    date-format: com.fasterxml.jackson.databind.util.StdDateFormat
+  http:
+    connect-time-out: 60
+    read-time-out: 60
+    write-time-out: 60
+    max-connection: 1000
+    max-request: 100
+    max-per-host-request: 30
+logging:
+  file:
+    path: /home/logs/${spring.application.name}
+  level:
+    org: warn
+    com: warn
+    i: warn
+    io: warn
+    reactor: warn
+    com.zsh: info
+    okhttp3:
+      OkHttpClient: error
+  logback:
+    rollingpolicy:
+      max-file-size: 100MB
+      max-history: 30
+aliyundrive:
+# 个人隐私信息
+  refresh-token:
+  auth:
+    enable: true
+    user-name: admin
+    password: admin
+resilience4j.retry:
+  instances:
+    retry-backend:
+      # 重试次数
+      max-attempts: 3
+      # 下一次重试等待时长
+      wait-duration: 1100
+      retry-exceptions:
+        # 需要重试的异常
+        - java.net.SocketTimeoutException
+        - java.io.IOException

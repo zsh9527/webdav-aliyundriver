@@ -24,8 +24,8 @@ import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Locale;
 
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 import net.sf.webdav.IMimeTyper;
 import net.sf.webdav.ITransaction;
