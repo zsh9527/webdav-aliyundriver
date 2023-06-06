@@ -41,6 +41,4 @@ public class WebdavTeambitionApplication {
         filterRegistrationBean.setEnabled(true);
         return filterRegistrationBean;
     }
-
-
 }

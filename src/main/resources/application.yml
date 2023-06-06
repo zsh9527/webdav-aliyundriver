@@ -4,6 +4,7 @@ server:
     connection-timeout: 1d
 spring:
   main:
+    # 允许循环依赖
     allow-circular-references: true
   application:
     name: ali-webdav
