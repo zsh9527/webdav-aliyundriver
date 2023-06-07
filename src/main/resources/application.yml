@@ -29,7 +29,8 @@ logging:
     i: warn
     io: warn
     reactor: warn
-    com.zsh: info
+    com.github.webdavteambition: info
+    net: warn
     okhttp3:
       OkHttpClient: error
   logback:
@@ -39,6 +40,7 @@ logging:
 aliyundrive:
 # 个人隐私信息
   refresh-token:
+  work_dir: /etc/aliyun-driver/
   auth:
     enable: true
     user-name: admin
