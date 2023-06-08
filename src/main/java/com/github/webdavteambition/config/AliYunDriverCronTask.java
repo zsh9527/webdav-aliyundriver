@@ -13,7 +13,7 @@ public class AliYunDriverCronTask {
     private AliYunDriverClientService aliYunDriverClientService;
 
     /**
-     * 每隔5分钟请求一下接口，保证token不过期
+     * 每隔5分钟请求一下接口，保证token不过期 TODO
      */
     @Scheduled(initialDelay = 30 * 1000, fixedDelay = 5 * 60 * 1000)
     public void refreshToken() {

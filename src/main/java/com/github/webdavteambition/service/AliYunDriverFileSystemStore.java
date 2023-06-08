@@ -3,6 +3,8 @@ package com.github.webdavteambition.service;
 import com.github.webdavteambition.model.FileType;
 import com.github.webdavteambition.model.PathInfo;
 import com.github.webdavteambition.model.result.TFile;
+import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 import net.sf.webdav.ITransaction;
 import net.sf.webdav.IWebdavStore;
 import net.sf.webdav.StoredObject;
@@ -22,12 +24,14 @@ import java.util.Enumeration;
 import java.util.Optional;
 import java.util.Set;
 
+@Slf4j
 public class AliYunDriverFileSystemStore implements IWebdavStore {
     private static final Logger LOGGER = LoggerFactory.getLogger(AliYunDriverFileSystemStore.class);
 
     private static AliYunDriverClientService aliYunDriverClientService;
 
     public AliYunDriverFileSystemStore(File file) {
+        log.warn("IWebdavStore初始化file" + file.getName());
     }
 
     public static void setBean(AliYunDriverClientService aliYunDriverClientService) {
@@ -65,20 +69,22 @@ public class AliYunDriverFileSystemStore implements IWebdavStore {
 
     @Override
     public void createFolder(ITransaction transaction, String folderUri) {
-        LOGGER.debug("createFolder {}", folderUri);
+        LOGGER.info("createFolder {}", folderUri);
 
         aliYunDriverClientService.createFolder(folderUri);
     }
 
+    /**
+     * 创建文件, 把功能合并到了setResourceContent
+     */
     @Override
     public void createResource(ITransaction transaction, String resourceUri) {
-        LOGGER.debug("createResource {}", resourceUri);
-
+        LOGGER.info("createResource {}", resourceUri);
     }
 
     @Override
     public InputStream getResourceContent(ITransaction transaction, String resourceUri) {
-        LOGGER.info("getResourceContent: {}", resourceUri);
+        LOGGER.debug("getResourceContent: {}", resourceUri);
         Enumeration<String> headerNames = transaction.getRequest().getHeaderNames();
         while (headerNames.hasMoreElements()) {
             String s = headerNames.nextElement();
@@ -129,7 +135,7 @@ public class AliYunDriverFileSystemStore implements IWebdavStore {
 
     @Override
     public String[] getChildrenNames(ITransaction transaction, String folderUri) {
-        LOGGER.info("getChildrenNames: {}", folderUri);
+        LOGGER.debug("getChildrenNames: {}", folderUri);
         TFile tFile = aliYunDriverClientService.getTFileByPath(folderUri);
         if (tFile.getType().equals(FileType.file.name())) {
             return new String[0];
@@ -142,11 +148,7 @@ public class AliYunDriverFileSystemStore implements IWebdavStore {
 
     @Override
     public long getResourceLength(ITransaction transaction, String path) {
-        return getResourceLength2(transaction, path);
-    }
-
-    public long getResourceLength2(ITransaction transaction, String path) {
-        LOGGER.info("getResourceLength: {}", path);
+        LOGGER.debug("getResourceLength: {}", path);
         TFile tFile = aliYunDriverClientService.getTFileByPath(path);
         if (tFile == null || tFile.getSize() == null) {
             return 384;
@@ -182,19 +184,16 @@ public class AliYunDriverFileSystemStore implements IWebdavStore {
 
     @Override
     public StoredObject getStoredObject(ITransaction transaction, String uri) {
-
-
         LOGGER.debug("getStoredObject: {}", uri);
         TFile tFile = aliYunDriverClientService.getTFileByPath(uri);
         if (tFile != null) {
             StoredObject so = new StoredObject();
             so.setFolder(tFile.getType().equalsIgnoreCase("folder"));
-            so.setResourceLength(getResourceLength2(transaction, uri));
+            so.setResourceLength(getResourceLength(transaction, uri));
             so.setCreationDate(tFile.getCreated_at());
             so.setLastModified(tFile.getUpdated_at());
             return so;
         }
-
         return null;
     }
 }

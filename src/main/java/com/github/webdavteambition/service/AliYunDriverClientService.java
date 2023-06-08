@@ -34,7 +34,7 @@ public class AliYunDriverClientService {
     private static ObjectMapper objectMapper = new ObjectMapper();
     private static String rootPath = "/";
     private static int chunkSize = 10485760; // 10MB
-    private TFile rootTFile = null;
+    private TFile rootTFile;
 
     private static Cache<String, Set<TFile>> tFilesCache = Caffeine.newBuilder()
             .initialCapacity(128)
@@ -49,6 +49,12 @@ public class AliYunDriverClientService {
     @PostConstruct
     void init() {
         AliYunDriverFileSystemStore.setBean(this);
+        rootTFile = new TFile();
+        rootTFile.setName("/");
+        rootTFile.setFile_id("root");
+        rootTFile.setCreated_at(new Date());
+        rootTFile.setUpdated_at(new Date());
+        rootTFile.setType("folder");
     }
 
     public Set<TFile> getTFiles(String nodeId) {
@@ -90,6 +96,9 @@ public class AliYunDriverClientService {
         return fileListFromApi(nodeId, tFileListResult.getNext_marker(), all);
     }
 
+    /**
+     * 创建文件 | 修改文件内容
+     */
     @SneakyThrows
     public void uploadPre(String path, long size, InputStream inputStream) {
         path = normalizingPath(path);
@@ -212,6 +221,9 @@ public class AliYunDriverClientService {
         clearCache();
     }
 
+    /**
+     * TODO 删除文件太多, 可使用批处理任务
+     */
     @SneakyThrows
     public void remove(String path) {
         path = normalizingPath(path);
@@ -265,17 +277,16 @@ public class AliYunDriverClientService {
         DownloadRequest downloadRequest = new DownloadRequest();
         downloadRequest.setDrive_id(aliYunClientProperties.getDriveId());
         downloadRequest.setFile_id(file.getFile_id());
-        String url = aliYunDriverClient.getDownloadUrl(downloadRequest).getUrl();
+        String url = aliYunDriverClient
+            .getDownloadUrl(downloadRequest, aliYunClientProperties.getXDeviceId(), aliYunClientProperties.getXSignature())
+            .getUrl();
         LOGGER.debug("{} url = {}", path, url);
         return aliYunDriverClient.download(url, request, size);
     }
 
     private TFile getNodeIdByPath2(String path) {
-        if (!StringUtils.hasLength(path)) {
-            path = rootPath;
-        }
-        if (path.equals(rootPath)) {
-            return getRootTFile();
+        if (!StringUtils.hasLength(path) || path.equals(rootPath)) {
+            return this.rootTFile;
         }
         PathInfo pathInfo = getPathInfo(path);
         TFile tFile = getTFileByPath(pathInfo.getParentPath());
@@ -304,18 +315,6 @@ public class AliYunDriverClientService {
         return pathInfo;
     }
 
-    private TFile getRootTFile() {
-        if (rootTFile == null) {
-            rootTFile = new TFile();
-            rootTFile.setName("/");
-            rootTFile.setFile_id("root");
-            rootTFile.setCreated_at(new Date());
-            rootTFile.setUpdated_at(new Date());
-            rootTFile.setType("folder");
-        }
-        return rootTFile;
-    }
-
     private TFile getNodeIdByParentId(String parentId, String name) {
         Set<TFile> tFiles = getTFiles(parentId);
         for (TFile tFile : tFiles) {
@@ -323,7 +322,6 @@ public class AliYunDriverClientService {
                 return tFile;
             }
         }
-
         return null;
     }
 

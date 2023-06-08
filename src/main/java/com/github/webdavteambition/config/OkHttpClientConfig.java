@@ -66,9 +66,17 @@ public class OkHttpClientConfig {
             // 如果连接成功，说明该端口是打开的
             Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", 18888));
             builder.proxy((proxy)).sslSocketFactory(sslSocketFactory(), x509TrustManager());
+            return;
         } catch (Exception ignored) {
 
         }
+        //try (Socket ignored1 = new Socket("127.0.0.1", 19527)) {
+        //    // 如果连接成功，说明该端口是打开的
+        //    Proxy proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress("127.0.0.1", 19527));
+        //    builder.proxy((proxy)).sslSocketFactory(sslSocketFactory(), x509TrustManager());
+        //} catch (Exception ignored) {
+        //
+        //}
     }
 
     private X509TrustManager x509TrustManager() {

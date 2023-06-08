@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import net.sf.webdav.exceptions.WebdavException;
 import okhttp3.*;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 
@@ -76,9 +77,8 @@ public class AliYunDriverClient {
         );
         Request.Builder requestBuilder = new Request.Builder()
             .header("x-canary", "client=web,app=adrive,version=v4.3.1")
-            .header("x-device-id", xDeviceId)
-            .header("x-signature", signatureData)
             .url(AliDriverConstants.HOSTNAME + "/users/v1/users/device/create_session");
+        addSignatureHeader(requestBuilder, xDeviceId, signatureData);
         RequestBody requestBody = RequestBody.create(objectMapper.writeValueAsBytes(body));
         requestBuilder.post(requestBody);
         String content = requestContent(requestBuilder.build()).body().string();
@@ -87,6 +87,31 @@ public class AliYunDriverClient {
             return true;
         }
         throw new WebdavException("签名失败:" + content);
+    }
+
+    /**
+     * 刷新签名
+     */
+    @Retry(name = "retry-backend")
+    public boolean renewSession(String xDeviceId, String signatureData) throws IOException {
+        Request.Builder requestBuilder = new Request.Builder()
+            .header("x-canary", "client=web,app=adrive,version=v4.3.1")
+            .url(AliDriverConstants.HOSTNAME + "/users/v1/users/device/renew_session");
+        addSignatureHeader(requestBuilder, xDeviceId, signatureData);
+        RequestBody requestBody = RequestBody.create("{}".getBytes());
+        requestBuilder.post(requestBody);
+        String content = requestContent(requestBuilder.build()).body().string();
+        if (content.contains(",\"success\":true")) {
+            return true;
+        }
+        throw new WebdavException("刷新签名失败:" + content);
+    }
+
+
+    private void addSignatureHeader(Request.Builder builder, String xDeviceId, String signatureData) {
+        builder
+            .header("x-device-id", xDeviceId)
+            .header("x-signature", signatureData);
     }
 
     /**
@@ -169,9 +194,10 @@ public class AliYunDriverClient {
     }
 
     @Retry(name = "retry-backend")
-    public DownloadUrlResp getDownloadUrl(DownloadRequest request) throws IOException {
+    public DownloadUrlResp getDownloadUrl(DownloadRequest request, String xDeviceId, String signatureData) throws IOException {
         Request.Builder requestBuilder = new Request.Builder()
             .url(AliDriverConstants.HOSTNAME + "/v2/file/get_download_url");
+        addSignatureHeader(requestBuilder, xDeviceId, signatureData);
         RequestBody requestBody = RequestBody.create(objectMapper.writeValueAsBytes(request));
         requestBuilder.post(requestBody);
         return requestContent(requestBuilder.build(), DownloadUrlResp.class);

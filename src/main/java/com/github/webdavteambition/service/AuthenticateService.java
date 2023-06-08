@@ -54,7 +54,7 @@ public class AuthenticateService {
                 .addHeader("User-Agent", AGENT_CONTENT)
                 .removeHeader("authorization")
                 .addHeader("authorization", aliYunClientProperties.getAccessToken());
-            if (request.method().equalsIgnoreCase("post") || request.method().equalsIgnoreCase("put")) {
+            if (request.method().equalsIgnoreCase("post")) {
                 builder.header("Content-Type", "application/json; charset=UTF-8");
             }
             return chain.proceed(builder.build());

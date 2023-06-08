@@ -1,11 +1,12 @@
 package com.github.webdavteambition.util;
 
-import jakarta.annotation.PostConstruct;
+import com.github.webdavteambition.constant.AliDriverConstants;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.jce.ECNamedCurveTable;
 import org.bouncycastle.jce.spec.ECNamedCurveParameterSpec;
 import org.web3j.crypto.ECKeyPair;
+import org.web3j.crypto.Hash;
 import org.web3j.crypto.Sign;
 
 import java.math.BigInteger;
@@ -16,17 +17,28 @@ import java.util.Arrays;
 /**
  * 签名工具类 Secp256k1算法签名
  * 参考吾爱破解教程, https://github.com/StickPoint/aliyundrive4j
+ * 未找到renew_session可行办法, 通过create_session签名代替
  */
 @Slf4j
 public class SignUtils {
 
     /**
      * 签名 -- 相同数据每次签名结果也不一样
+     */
+    public static String signatureByDeviceAndUserAndNonce(String xDeviceId, String userId, int nonce) {
+        // 生成需要签名数据
+        String signData = String.format("%s:%s:%s:%d", AliDriverConstants.SECP_APP_ID, xDeviceId, userId, nonce);
+        byte[] privateKeyBytes = SignUtils.hexToBytes(xDeviceId);
+        byte[] hash = Hash.sha256(signData.getBytes(StandardCharsets.UTF_8));
+        return signature(hash, privateKeyBytes);
+    }
+
+    /**
+     * 签名 -- 相同数据每次签名结果也不一样, renew_session验证通不过
      *
      * @param privateKeyBytes 使用x-device-id作为私钥, 随机生成一个也可以
      */
     @SneakyThrows
-    @PostConstruct
     public static String signature(byte[] signData, byte[] privateKeyBytes) {
         ECKeyPair ecKeyPair =  ECKeyPair.create(new BigInteger(1, privateKeyBytes));
         log.info("Raw private key: " + ecKeyPair.getPrivateKey().toString(16));
@@ -100,4 +112,6 @@ public class SignUtils {
         }
         return bytes;
     }
+
+
 }

@@ -8,6 +8,7 @@ import com.github.webdavteambition.model.result.UserInfoResp;
 import com.github.webdavteambition.util.SignUtils;
 import com.github.webdavteambition.client.AliYunDriverClient;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.SneakyThrows;
@@ -21,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 /**
  * 阿里云client相关属性
@@ -70,11 +72,11 @@ public class AliYunClientProperties implements Serializable {
         File file = new File(filename);
         if (file.exists()) {
             try {
-                AliYunClientProperties fileConfig = objectMapper.readValue(file, AliYunClientProperties.class);
-                this.driveId = fileConfig.driveId;
-                this.userId = fileConfig.userId;
-                this.xDeviceId = fileConfig.xDeviceId;
-                this.xSignature = fileConfig.xSignature;
+                Map<String, String> fileConfig = objectMapper.readValue(file, Map.class);
+                this.xDeviceId = fileConfig.get("xdevice_id");
+                this.publicKey = fileConfig.get("public_key");
+                this.accessToken = fileConfig.get("access_token");
+                this.refreshToken = fileConfig.get("refresh_token");
             } catch (IOException e) {
                 log.warn("读取配置文件失败");
             }
@@ -107,21 +109,14 @@ public class AliYunClientProperties implements Serializable {
      */
     @SneakyThrows
     void initSignConfig() {
-        if (!StringUtils.hasLength(this.xDeviceId) || !StringUtils.hasLength(this.xSignature)) {
+        if (!StringUtils.hasLength(this.xDeviceId) || !StringUtils.hasLength(this.publicKey)) {
             // x-device-id 可以使用随机数, 没有限制, 作为私钥使用
-            var xDeviceId = SignUtils.getSHA256Encode(this.userId);
-            var publicKey = SignUtils.generatePublicKey(xDeviceId);
-            // 生成需要签名数据
-            String signData = String.format("%s:%s:%s:%d", AliDriverConstants.SECP_APP_ID, xDeviceId, userId, 0);
-            byte[] privateKeyBytes = SignUtils.hexToBytes(xDeviceId);
-            byte[] hash = Hash.sha256(signData.getBytes(StandardCharsets.UTF_8));
-            // 使用 ECKeyPair 对象进行签名
-            var signatureData = SignUtils.signature(hash, privateKeyBytes);
-            if (aliYunDriverClient.createSession(xDeviceId, publicKey, signatureData)) {
-                this.setXDeviceId(xDeviceId);
-                this.setXDeviceId(signData);
-            }
+            this.xDeviceId = SignUtils.getSHA256Encode(this.userId);
+            this.publicKey = SignUtils.generatePublicKey(this.xDeviceId);
         }
+        var signatureData = SignUtils.signatureByDeviceAndUserAndNonce(xDeviceId, userId, nonce++);
+        aliYunDriverClient.createSession(xDeviceId, publicKey, signatureData);
+        this.xSignature = signatureData;
     }
 
     /**
@@ -144,6 +139,9 @@ public class AliYunClientProperties implements Serializable {
 
     private String xDeviceId;
 
+    private String publicKey;
+
+    @JsonIgnore
     private String xSignature;
 
     private String accessToken = "";
@@ -151,9 +149,16 @@ public class AliYunClientProperties implements Serializable {
     private String refreshToken;
 
     /**
+     * 签名随机数, 从0递增
+     */
+    @JsonIgnore
+    private int nonce = 0;
+
+    /**
      * 保存配置到文件
      */
     @SneakyThrows
+    @PreDestroy
     public void writeConfigToFile() {
         File file = new File(filename);
         File directory = file.getParentFile();

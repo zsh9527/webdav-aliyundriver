@@ -1,17 +1,20 @@
 @echo off
-:: ╧ртьwebdav╣╫╠╬╣ьеЗ╢╕юМ╫е╠╬
+@chcp 65001
+:: Ф▄┌Х╫╫WebDAVЕ┬╟Ф°╛Е°╟Г⌡≤Г╛╕
+@set WEBDAV_SERVER=http://127.0.0.1:9027
+set DRIVE_LETTER=Z:
+set USERNAME=admin
+set PASSWORD=admin
 
-setlocal
-set WebDAV_URL=https://127.0.0.1:9027
-set DriveLetter=Z:
-set Username=admin
-set Password=admin
+@echo on
+REM Е▐√Ф╤┬Ф▄┌Х╫╫Е▒╫Д╩╓Д╦╨ net use Z: /delete
+@echo off
 
-net use %DriveLetter% %WebDAV_URL% /user:%Username% %Password% /persistent:yes
+net use %DRIVE_LETTER% %WEBDAV_SERVER% /user:%USERNAME% %PASSWORD% /persistent:yes >nul 2>&1
 
-if %errorlevel% equ 0 (
-    echo WebDAV╧ртьЁи╧╕ё╛ел╥Шн╙ %DriveLetter%.
+
+if %ERRORLEVEL% equ 0 (
+    echo Ф▄┌Х╫╫Ф┬░Е┼÷, Г⌡≤Г╛╕Д╦╨О╪  %DRIVE_LETTER%
 ) else (
-    echo WebDAV╧ртьй╖╟э.
+    echo Ф▄┌Х╫╫Е╓╠Х╢╔, Х╞╥И≤┘Х╞╩MountHelp.md
 )
-endlocal
