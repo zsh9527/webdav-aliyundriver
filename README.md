@@ -14,7 +14,7 @@
   - [TODO](#todo)
 - [免责声明](#免责声明)
 
-# webdav-aliyundriver
+# ~~~webdav-aliyundriver~~~ 已失效, 阿里云盘限制了web api
 本项目基于原项目https://github.com/zxbu/webdav-aliyundriver 停更项目进行维护,此项目实现了阿里云盘的webdav协议，只需要简单的配置一下，就可以让阿里云盘变身为webdav协议的文件服务器。
 基于此，你可以把阿里云盘挂载为Windows、Linux、Mac系统的磁盘，可以通过NAS系统做文件管理或文件同步，更多玩法等你挖掘
 
